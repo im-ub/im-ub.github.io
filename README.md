@@ -4,7 +4,7 @@ BE in Industrial and Management Engineering | (Hankuk University of Foriegn Stud
 
 ## [projects](projects/)
 - Pioneering Predictive Analytics in Prenatal Care
-- Automated Generation System of Streaming Broadcast Highlights using Machine Learning
+- **Automated Generation System of Streaming Broadcast Highlights using Machine Learning** (Capston Project)
 - KBO(Korea Baseball Organization) data analysis and win rate prediction
 - Shortest Path for manager of Swing
 - Beer Distribution Management Database
