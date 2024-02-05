@@ -1,4 +1,4 @@
 # im-ub.github.io
 
 ## projects
-projects
+im-ub.github.io/projects/
