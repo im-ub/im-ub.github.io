@@ -1,2 +1,2 @@
-# imub.github.io
+# im-ub.github.io
 
