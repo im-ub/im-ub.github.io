@@ -8,3 +8,10 @@ BE in Industrial and Management Engineering | (Hankuk University of Foriegn Stud
 - KBO(Korea Baseball Organization) data analysis and win rate prediction
 - Shortest Path for manager of Swing
 - Beer Distribution Management Database
+
+## [Work]
+*Most of them have no code file because of policy*
+- Customer Data Analysis with Developed Dependency Ratings and Customer Segmentation
+- Development of Senior Nutritional Care Solution
+- Pluto Project: related with Natural Language Processing 
+- Data Contamination Management
