@@ -1,0 +1,923 @@
+---
+title: "Pioneering Predictive Analytics in Prenatal Care"
+author: "Yoobee Lim, Damini Sri Vadrevu"
+date: "12-17-23"
+format: 
+  html:
+     theme: cosmo
+     code-line-numbers: true
+     linkcolor: blue
+     toc: true
+     toc-depth: 3
+     embed-resources: true
+     self-contained-math: true
+editor: visual
+fig-cap-location: top
+---
+
+## 1. Abstract:
+
+The project aims to evaluate and compare two distinct statistical modeling approaches -- ordinal categorical response modeling and binary logit modeling -- in the context of predicting fetal health. The ordinal model is chosen for its ability to account for the natural order of the categories in the fetal health data, which includes three levels. Conversely, the binary model simplifies the problem by converting these levels into a binary format (0 and 1), potentially losing some nuanced information but potentially gaining in model simplicity and interpretability. We aim to understand which model provides more accurate and reliable predictions. This comparison will not only help in determining the best approach for this specific dataset but will also contribute to broader knowledge in the field of medical statistics, particularly in prenatal health care.
+
+## 2. Literature Review
+
+The use of cardiotocograms (CTGs) for monitoring fetal well-being has been a focal point of research, as highlighted in studies like that of Ayres-de-Campos et al. (2001), which introduced SisPorto 2.0 for automated CTG analysis. Two primary statistical approaches have emerged in this domain: ordinal categorical response modeling and binary logit modeling. Ordinal models, recognized for handling ordered categories, are particularly relevant for datasets with naturally ordered levels, like fetal health states (Normal, Suspect, Pathological). Conversely, binary logit models, praised for their simplicity and interpretability, categorize outcomes in a binary format, often used in medical decision-making. This study aims to evaluate and compare these two approaches in the context of fetal health prediction. Previous research has often grappled with the trade-off between the nuanced understanding provided by ordinal models and the straightforwardness of binary models (Reference Studies). The efficacy of these models is typically assessed through metrics like accuracy, precision, recall, and F1-score, crucial for ensuring reliable and actionable predictions in prenatal care primarily focusing on recall. Our analysis extends this ongoing discourse by offering a comparative evaluation of these models using a rich dataset of fetal health records, thereby contributing to the optimized use of statistical methods in medical diagnostics.
+
+## 3. Dataset Description:
+
+> Source of Dataset: <https://www.kaggle.com/datasets/andrewmvd/fetal-health-classification>
+
+Maternal mortality runs parallel to the idea of infant mortality, which includes 295 000 fatalities during and after pregnancy and childbirth (as of 2017). 94% of these deaths took place in low-resource environments, and the majority of them were avoidable. Given the foregoing, cardiotocograms (CTGs) are an easy and affordable way to evaluate fetal health, enabling medical practitioners to take preventative measures against mother and infant death. The device itself functions by delivering ultrasonic pulses and interpreting the response, providing information on a variety of topics including uterine contractions, fetal movements, and fetal heart rate (FHR).
+
+```{r, echo=FALSE}
+data <- read.csv("C:/Users/vadre/OneDrive/Desktop/fetal_health.csv")
+# Make feature name shorter to make it looks better
+names(data)[names(data) == "abnormal_short_term_variability"] <- "per_srt_var"
+names(data)[names(data) == "mean_value_of_short_term_variability"] <- "mean_srt_var"
+names(data)[names(data) == "percentage_of_time_with_abnormal_long_term_variability"] <- "per_long_var"
+names(data)[names(data) == "mean_value_of_long_term_variability"] <- "mean_long_var"
+```
+
+Within the dataset, there are predictors designed for fetal health classification. To gain a comprehensive understanding, we propose a visual inspection through the creation of histograms for each of these predictor
+
+```{r, echo=FALSE}
+# Set up the plotting area with multiple panels in one row
+par(mfrow = c(3, 4), mar = c(4, 4, 2, 1) + 0.1)  # Adjust the layout as needed
+
+# Loop through each column and create a histogram
+for (col in colnames(data)) {
+  hist(data[[col]], main = paste( col), xlab = col, col = "lightblue", border ="white")
+}
+```
+
+### 3.1 An Overview of Independent and Dependent Variables:
+
+#### 3.1.1 Target Response
+
+`fetal_health` 2126 records of features taken from cardiotocogram tests are included in this dataset. Three experienced obstetricians divided the features into three classes:
+
+1.  *Normal*
+
+2.  *Suspect*
+
+3.  *Pathological*
+
+#### 3.1.2 Independent Variables:
+
+1.  `abnormal_short_term_variability` : Any instance where the Fetal heart rate \[FHR\] changes very little from one heartbeat to the next, specifically by less than one beat per minute (bpm). These small changes are considered abnormal Short term variability \[STV\]
+
+2.  `mean_value_of_short_term_variability` : reflects the typical amount of variability in FHR over a short period.
+
+3.  `percentage_of_time_with_abnormal_long_term_variability`: The system also calculates how often these abnormal variations occur, expressed as a percentage point.
+
+4.  `fetal_movement` : Movements of the fetus as recorded by the fetal monitor.
+
+5.  `baseline.value` : The average fetal heart rate (FHR) when the fetus is at rest. The goal is to have a consistent and stable reference point that reflects the normal, undisturbed heart rate of the fetus to establish a clearer picture of the fetus's health by distinguishing between normal restful periods and times when there might be cause for concern.
+
+6.  `light_decelerations` : Decelerations refer to periods when the fetal heart rate (FHR) drops below the usual baseline rate for at least 15 seconds. If the drop in heart rate doesn't last longer than 2 minutes (120 seconds), it's considered mild.
+
+7.  `severe_decelerations` : When the drop in heart rate lasts for 5 minutes (300 seconds) or more, it's classified as severe.
+
+8.  `prolongued_decelerations` : If the decrease in heart rate continues for more than 2 minutes (120 seconds), it's termed prolonged.
+
+9.  `uterine_contractions` : Uterine contractions during pregnancy are movements where the muscles of the uterus tighten and then relax. True uterine contractions are identified when there's a consistent upward shift in the signal that lasts for a certain period.
+
+10. `accelerations` : Brief moments when the baby's heart beats faster. Accelerations in fetal heart rate (FHR) are temporary increases above baseline.For an increase to be considered an acceleration, it must; last between 15 to 20 seconds, rise to at least 15 beats per minute (bpm) higher than the baseline.
+
+11. `mean_value_of_long_term_variability` : Long-term variability (LTV) refers to the fluctuations in the fetal heart rate (FHR) over a long period, typically around one minute or more
+
+### 3.2 A Program for Automated Analysis of Cardiotocograms
+
+> Authors : Ayres-de-Campos, D., Bernardes, J., Garrido, A., Marques-de-Sá, J., & Pereira-Leite
+>
+> Publication date (Electronic): January 2 2001
+>
+> Journal: [The Journal of maternal-fetal medicine](https://www.tandfonline.com/action/journalInformation?show=aimsScope&journalCode=ijmf20)
+>
+> Publisher: [Wiley](https://www.scienceopen.com/search#%7B%22order%22%3A0%2C%22context%22%3A%7B%22publisher%22%3A%7B%22id%22%3A%22Wiley%22%2C%22kind%22%3A60%7D%2C%22kind%22%3A13%7D%2C%22orderLowestFirst%22%3Afalse%2C%22kind%22%3A77%7D)
+
+The article introduces SisPorto 2.0, an advanced software designed for the automated analysis of cardiotocograms (CTGs), which are used to monitor fetal health. \[Ayres-de Campos D, Bernardes J, Garrido A, Marques-de-Sá J, Pereira-Leite L. SisPorto 2.0: a program for automated analysis of cardiotocograms. J Matern Fetal Med. 2000;9(5):311-318. doi:10.1002/15206661(200009/10)9:5\<311::AID-MFM12\>3.0.CO;2-9 [@Ayres-de2000]\]. SisPorto 2.0 aims to enhance the precision of CTG interpretation by automating the process in line with the guidelines of the International Federation of Gynecology and Obstetrics (FIGO). [Link to Article](https://www.academia.edu/23797622/SisPorto_2_0_A_Program_for_Automated_Analysis_of_Cardiotocograms)
+
+## 4. Data Pre-Processing
+
+### 4.1 Merging Categorical Responses for Binary Models
+
+'Suspect' and 'Pathological' categorical responses were combined into a single category for better foetal health monitoring. This strategic amalgamation addresses multiple important factors, including clinical significance, resource allocation, recall prioritisation, data distribution balance, and clinical decision-making.
+
+1.  [Clinical Significance:]{.underline} The primary concern in many clinical scenarios, particularly in fetal healthcare, is differentiating normal from at-risk conditions. By merging 'Suspect' and 'Pathological' responses, the analysis distinctly focuses on identifying any deviation from normalcy. This is vital for triggering necessary medical interventions or continuous monitoring, thereby underscoring a preventive approach in prenatal care.
+
+2.  [Balance in Data Distribution:]{.underline} From a data science perspective, the merging of these categories results in a more balanced dataset. This balance is instrumental for the effective application of various analytical techniques, especially certain machine learning algorithms that might struggle with highly imbalanced data. A binary classification enhances the model's ability to identify any anomalies from the norm, essential in prenatal diagnostics.
+
+3.  [Emphasis on Recall over Precision]{.underline}: In fetal health monitoring, the concept of recall (sensitivity) becomes more significant than precision. This emphasis is due to the high cost associated with false negatives. The model's objective shifts to minimizing missed at-risk cases (suspect/pathological), prioritizing almost all such cases being flagged for additional investigation or treatment.
+
+4.  [Resource Allocation and Healthcare Planning]{.underline}: Merging these categories aids healthcare systems in resource allocation and planning. The simplified binary categorization assists in setting priorities in maternal-fetal care services, ensuring efficient and focused utilization of medical resources.
+
+## 5. Primary Objective
+
+The goal of our project is to conduct a comprehensive data-driven evaluation of two statistical modeling approaches -- ordinal categorical response modeling and binary logit modeling -- in the context of predicting fetal health.
+
+## 6. STATISTICAL METHODOLOGY
+
+### 6.1 Logistic Regression
+
+For categorization and predictive analytics, this kind of statistical model---also referred to as the logit model---is frequently employed. Logistic regression uses a dataset of independent variables to estimate the likelihood of an event occurring, such as voting or not. Because the result is a probability, the dependent variable has a range of 0 to 1. A logit transformation is performed to the odds in logistic regression, which are the probability of success divided by the probability of failure. This is sometimes referred to as the natural logarithm of odds or the log odds.
+
+Binary Logit Model can be expressed as:
+
+$$
+\pi_i = P(Y_i =1 | \mathbf{x}_i) = \frac{\exp(\beta_0 + \sum_{j=1}^p  \beta_j X_{i,j})}{
+1+ \exp(\beta_0 + \sum_{j=1}^p  \beta_j X_{i,j})}.
+$$ {#eq-logitglim3}
+
+Logistic regression is utilized for binary classification tasks. By converting the fetal health classes 2 and 3 into a single class (1) and class 1 into 0, we create a binary outcome to predict.
+
+### 6.2 Regression Tree-Based Methods
+
+An algorithm for supervised learning is a decision tree algorithm. The strategy that divides a dataset into smaller subsets is a top-down, greedy one. The best predictor variable, or feature, is represented by the root node, which lies at the top of the decision tree. The predictors, or characteristics, are divided into two branches at each decision node. This binary splitting procedure is then repeated until the leaf nodes, which are utilized to generate the final prediction, are reached. Recursive partitioning is the term for this branching.
+
+#### 6.2.1 Classification and Regression Trees \[CART\]
+
+The CART algorithm is a tree-building technique that is non-parametric and can model complex interactions between variables. It is particularly useful for identifying the structure within the data. The algorithm splits the data into subsets based on the value of the input variables; these splits are chosen to maximize the homogeneity of the resulting subsets. Each fork in the decision tree is divided into a predictor variable, and at the conclusion, each node has a prediction for the target variable.
+
+Gini Index: $$
+\mbox{Gini index} = 1 - \sum_{j=1}^J p^2_j,  
+$$ {#eq-gini-index}
+
+The following decision tree categories are collectively referred to by the term CART:
+
+-   Classification Trees: When a variable is continuous, the tree is used to ascertain which "class" it is most likely to fall into.
+
+-   Regression trees: These are employed to forecast the value of a continuous variable.
+
+The target variable's projected class label or value is stored in the leaf nodes of the tree. Splitting criteria: To split the data at each node, CART employs a greedy strategy. After weighing each split's potential, it chooses the one that will produce subsets with the least amount of impurity. CART employs Gini impurity as the splitting criterion for classification tasks. The cleanliness of the subgroup increases with decreasing Gini impurity. CART employs residual reduction as the splitting criterion for regression tasks.
+
+#### 6.2.2 Random Forests
+
+Regression is an ensemble strategy that uses numerous decision trees along with a technique called Bootstrap and Aggregation, or bagging, to solve both regression and classification tasks. The fundamental idea here is to use a combination of decision trees instead of depending only on one to determine the final result.
+
+Ensemble learning encompasses several techniques, such as:
+
+-   Bagging (Bootstrap Aggregating): In this approach, numerous models are trained on distinct random subsets of the training data. The collective output is obtained, usually through an averaging process, from the predictions of these individual models.
+
+-   Boosting: This technique sequentially trains a series of models. Each model in the sequence specifically aims to correct the mistakes of its predecessor. The final output is derived by integrating the predictions of all models, with a focus on weighted voting.
+
+-   Stacking: This involves a two-tier model structure. The initial level comprises a set of models whose predictions are used as input features for a second-level model. The ultimate prediction is then made by this second-level model.
+
+Many decision trees serve as the foundational learning models for Random Forest. For each model, we create sample datasets by randomly selecting rows and features from the dataset. This section is known as Bootstrap. Because predictors are selected at random from the entire collection of predictors during data training, the word "random" emerges.
+
+Observations in the training sample that were excluded from the first bootstrap sample are known as out-of-bag (OOB) observations. In a similar vein, each bootstrap sample (decision tree) will have OOB observations associated with it. The leftover or OOB samples will be provided as unseen data to decision trees that did not incorporate them after the various decision tree models have been trained. These will be predicted by the decision trees to be either 1 or 0. The average error for each training observation determined by utilising predictions from the trees in each bootstrap sample that did not include this training observation is known as the out-of-bag (OOB) error. This makes it possible to fit and validate the Random Forest classifier while it is being trained.
+
+#### 6.2.3 Gradient Boosting
+
+Boosting, much like random forests, is a robust, ready-to-use learning algorithm. It's particularly effective in high-dimensional settings with many features, delivering strong predictive results. While random forests create a collective of deep, independent trees, gradient boosting methods (GBMs) gradually assemble a series of shallow trees. Each new tree in this series learns from its predecessor, resulting in a precise and powerful predictive tool when combined. In the realm of binary response modeling, boosting was developed to enhance the efficacy of weak learners.
+
+It achieves this by adjusting the training data's responses, assigning greater weight to incorrectly classified instances. This process produces an improved binary classifier, boosting feature performance, especially in the more uncertain regions of the feature space. A notable example is the gradient boosting algorithm, with XGBoost (short for eXtreme Gradient Boosting) emerging as a popular choice for predictive modeling. XGBoost can be implemented using its namesake package and is often considered a more efficient and accurate option compared to alternatives like the gbm package. This method is also known as regularized gradient boosting.
+
+## 7. Logistic Regression
+
+The data consists of information on n = 2126 fetuses among whom $n_1$ = 1655 exhibit a normal health status, $n_2$ = 295 are classified as suspect, $n_3$ = 176 have pathological condition. The dataset is enriched with 11 potential predictor variables.
+
+Our reasearch questions: Are these variables useful for predicting fetal health(classification)? How well does the binary logit model perform for fetal health classification?
+
+### 7.1 Conversion to Binary Response
+
+Before fitting the model, it is imperative to change the current three-class classification to the binary responses.
+
+```{r, echo=FALSE}
+
+data$fetal_health <- ifelse(data$fetal_health == 1, 0, 1)
+value_counts <- table(data$fetal_health)
+print(value_counts)
+
+
+```
+
+```{r, echo=FALSE, fig.width=5, fig.height=4}
+health_counts <- table(data$fetal_health)
+
+barplot(health_counts, col = "lightblue", main = "Fetal Health States", xlab = "Fetal Health State", ylab = "counts")
+```
+
+### 7.2 Train and Test Data
+
+We divide the data into an 80-20 train-test ratio. The train data, which consists of 1700 cases, will be used to train the logit regression model, and the test data, which consists of 426 cases, will be used to verify accuracy.
+
+```{r, echo=FALSE}
+set.seed(123457)
+train.prop <- 0.80
+strats <- data$fetal_health
+rr <- split(1:length(strats), strats)
+idx <- sort(as.numeric(unlist(sapply(rr, function(x) sample(x, length(x)*train.prop)))))
+data.train <- data[idx, ]
+data.test <- data[-idx, ]
+```
+
+In general, it is helpful to check if the train and test data accurately depict the variable distributions and overall data structure. We may check to determine whether the train, test, and total data sets have the same proportions of the two levels of the response.
+
+```{r, echo=FALSE}
+combined_table <- cbind(
+  Train = table(data.train$fetal_health) / nrow(data.train),
+  Test = table(data.test$fetal_health) / nrow(data.test),
+  Overall = table(data$fetal_health) / nrow(data)
+)
+
+# Print the combined table
+print(combined_table)
+```
+
+### 7.3 Fitting Logistic Regression Models
+
+Fit three models: a full model with all predictors, a null model with only the intercept, and a model employing variable selection. Subsequently, compare the Akaike Information Criterion (AIC) across the models.
+
+#### 7.3.1 Model with Full Model with all Predictors
+
+```{r, echo=FALSE}
+full.logit <- glm(fetal_health ~ . ,data = data.train, 
+                  family = binomial(link = "logit"))
+summary_result = summary(full.logit)
+print(summary_result$coefficients[, c("Estimate", "Std. Error", "z value", "Pr(>|z|)")])
+print(summary_result$aic)
+```
+
+The results shed light on the significance of coefficients in elucidating the fetal health status categorized as poor (1). The model's predictive performance is evident in the difference between the **null deviance** (**1796.54** on 1699 d.f.) and **residual deviance** (**692.73** on 1688 d.f.), with a larger gap indicating better model fit. The **AIC** stands at **716.73** for concise evaluation.
+
+#### 7.3.2 Fitting Null Model with only Intercept
+
+The outcomes are displayed below, revealing an AIC of 1798.5, significantly higher than that of the full model.
+
+```{r, echo=FALSE}
+null.logit <- glm(fetal_health ~ 1 ,data = data.train, 
+                  family = binomial(link = "logit"))
+summary_result<-summary(null.logit)
+print(summary_result$coefficients[, c("Estimate", "Std. Error", "z value", "Pr(>|z|)")])
+print(summary_result$aic)
+```
+
+#### 7.3.3 Fitting Model with Chosen Predictors
+
+We employed both backward and forward selection methods to identify predictors explaining fetal health. Interestingly, the results indicate that using either backward elimination or forward selection alone yields the same outcome as using both methods concurrently.
+
+The results of the fitted model with the selected predictors are presented below. Notably, the AIC is 713.66, slightly smaller than the AIC of the full model, which is 716.73.
+
+```{r, echo=FALSE}
+both.logit <- step(null.logit, list(lower=formula(null.logit),
+                                    upper=formula(full.logit)),
+                   direction="both",trace=0, data = bank.data.train)
+
+summary_result<-summary(both.logit)
+print(summary_result$coefficients[, c("Estimate", "Std. Error", "z value", "Pr(>|z|)")])
+print(summary_result$aic)
+```
+
+AIC comparisons indicate that the full model and the one utilizing both backward and forward selection are similar and superior to the null model. In terms of **AIC** values, the **full model is slightly larger than the model with variable selection**, suggesting that the latter performs slightly better.
+
+```{r, echo=FALSE}
+cat("Residual diviance:\n")
+cat("null model:", null.logit$deviance, "\n")
+cat("full model:", full.logit$deviance, "\n")
+cat("both model:", both.logit$deviance, "\n")
+```
+
+However, it's essential to note that the residual deviance from the full model is the smallest among the three models, making either the full model or the one with variable selection preferable on the training dataset.
+
+### 7.4 Evaluating Performance of Model
+
+We evaluate how well the models fit the response from the test data. With the merger of suspect and pathological categories, our focus leans towards recall over precision or accuracy, giving priority to sensitivity since prevention is better especially in prenatal healthcare.
+
+#### 7.4.1 Assess Test Data with Confusion Matrix
+
+We calculate and compare the confusion matrices, followed by computing recall as percentages for the test data.
+
+```{r, echo=FALSE}
+# Function to calculate precision
+precision <- function(conf_matrix) {
+  TP <- conf_matrix[2, 2]
+  FP <- conf_matrix[1, 2]
+  return(round((TP / (TP + FP))*100,2))
+}
+# Function to calculate recall
+recall <- function(conf_matrix) {
+  TP <- conf_matrix[2, 2]
+  FN <- conf_matrix[2, 1]
+  return(round((TP / (TP + FN))*100,2))
+}
+# Function to calculate F1-score
+f1_score <- function(conf_matrix) {
+  prec <- precision(conf_matrix)
+  rec <- recall(conf_matrix)
+  return(round(2 * (prec * rec) / (prec + rec),2))
+}
+```
+
+```{r, echo=FALSE}
+pred.full <- predict(full.logit, newdata = data.test, type="response")
+pred.both <- predict(both.logit, newdata = data.test, type = "response")
+
+table.full <- table(data.test$fetal_health, pred.full > 0.5)
+
+precision_full <- precision(table.full)
+recall_full <- recall(table.full)
+f1_score_full <- f1_score(table.full)
+```
+
+```{r, echo=FALSE}
+table.both <- table(data.test$fetal_health, pred.both > 0.5)
+
+precision_both <- precision(table.both)
+recall_both <- recall(table.both)
+f1_score_both <- f1_score(table.both)
+```
+
+```{r, echo=FALSE}
+table.both <- table(data.test$fetal_health, pred.both > 0.5)
+
+precision_both <- precision(table.both)
+recall_both <- recall(table.both)
+f1_score_both <- f1_score(table.both)
+```
+
+```{r, echo = FALSE}
+cat("Metrics Comparison:\n")
+cat(sprintf("                 Full Model     Both Model\n"))
+cat(sprintf("Accuracy:        %.2f%%         %.2f%%\n", (sum(diag(table.full))/sum(table.full))*100, (sum(diag(table.both))/sum(table.both))*100))
+cat(sprintf("Precision:       %.2f%%         %.2f%%\n", precision_full, precision_both))
+cat(sprintf("Recall:          %.2f%%         %.2f%%\n", recall_full, recall_both))
+cat(sprintf("F1-Score:        %.2f%%         %.2f%%\n", f1_score_full, f1_score_both))
+
+```
+
+As a result, it was found that the **recall for** the **full model is 70.53%**, while the **both model** shows a slight improvement with a **recall of 71.58%**. This nuanced enhancement leads us to prefer the model utilizing variable selection as our logistic regression model. The recall of **71.58%** suggest that a relatively high percentage of actual positive cases were correctly identified by the models. In general, higher recall percentages indicate better performance in capturing true positives.
+
+Looking ahead, we plan to extend our evaluation by comparing these percentages with other models, including CART, Random Forest, XGBoost, and Ordinal logistic regression. This comparative analysis will provide valuable insights into the relative performance of these models across the dataset.
+
+#### 7.4.2 ROC Curve
+
+The ROC curve, a vital metric, assesses prediction accuracy in binary and multi-class classification. It gauges the trade-off between sensitivity (true positive rate) and specificity (false positive rate) in predictions.
+
+```{r, echo=FALSE,  results='hide', message=FALSE, warning=FALSE}
+library(pROC)
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+pred.null <- predict(null.logit, newdata = data.test, type="response")
+pred.full <- predict(full.logit, newdata = data.test, type="response")
+pred.both <- predict(both.logit, newdata = data.test, type = "response")
+
+roc.null <- suppressWarnings(roc(data.test$fetal_health, pred.null, levels=c(1,0)))
+auc_null <- suppressWarnings(auc(data.test$fetal_health, pred.null))
+
+roc.full <- suppressWarnings(roc(data.test$fetal_health, pred.full, levels=c(1,0)))
+auc_full <- suppressWarnings(auc(data.test$fetal_health, pred.full))
+
+roc.both <- suppressWarnings(roc(data.test$fetal_health, pred.both, levels=c(1,0)))
+auc_both <- suppressWarnings(auc(data.test$fetal_health, pred.both))
+```
+
+The AUC (area under the curve) for the test data is almost identical in both models, full and both.
+
+```{r, echo=FALSE,  fig.width=7, fig.height=3}
+par(mfrow = c(1, 3))
+plot(roc.null, main = "ROC Curve - Null Model", col = "blue", lwd = 2)
+text(0.8, 0.2, paste("AUC =", round(auc_null, 2)), col = "blue")
+
+plot(roc.full, main = "ROC Curve - Full Model", col = "green", lwd = 2)
+text(0.8, 0.2, paste("AUC =", round(auc_full, 2)), col = "green")
+
+plot(roc.both, main = "ROC Curve - Both Model", col = "purple", lwd = 2)
+text(0.8, 0.2, paste("AUC =", round(auc_both, 2)), col = "purple")
+```
+
+In summary, the AUC for the full model and the Both Model indicates that these models are highly effective for the classification task at hand, with strong predictive performance. Both being better than the full model even though highly similar.
+
+## 8. CART Algorithm
+
+### 8.1 Implement CART Algorithm
+
+Initially, the CART algorithm is employed to grow the tree using all predictors. The subsequent step involves pruning the tree by selecting the optimal complexity parameter (CP) based on minimizing cross-validated prediction error (xerror).
+
+```{r, echo=FALSE}
+library(rpart)
+```
+
+```{r}
+fit.allp <- rpart(fetal_health ~., method = "class", data = data.train,
+                  control = rpart.control(minsplit = 1, cp = 0.001))
+```
+
+We implement the CART algorithm and the least cross-validated prediction error (xerror) is shown below along with the corresponding complexity parameter (CP).
+
+```{r, echo=FALSE}
+xerr = fit.allp$cptable[which.min(fit.allp$cptable[, "xerror"]), "xerror"]
+cp= fit.allp$cptable[which.min(fit.allp$cptable[, "xerror"]), "CP"]
+
+cat("Smallest xerror:",xerr, "\n")
+cat("corresponding CP:",cp)
+```
+
+The term "smallest xerror" describes the lowest cross-validated error rate that the tree was able to attain after trimming. It is a gauge of the pruned tree's performance in relation to the entire, unpruned tree. That comes out to be roughly 0.319, or 31.9%.
+
+Corresponding Complexity Parameter (CP): The best compromise between tree complexity and model correctness is found in the CP value that corresponds to the minimum cross-validated error. It's the level of complexity at which trimming ought to end. A simpler model will emerge from more frequent pruning of a tree with a lower CP. When it comes to minimising errors without overfitting, the tree size that works best is shown by the CP of 0.002659574.
+
+### 8.2 Visualizing Cross-Validation Results
+
+This section showcases a plotted representation of cross-validation results, aiding in the identification of the optimal complexity parameter for minimal prediction errors.
+
+```{r, echo=FALSE,  fig.width=5, fig.height=4}
+plotcp(fit.allp)
+```
+
+```{r, echo=FALSE,  fig.width=5, fig.height=4}
+library(rpart.plot)
+#rpart.plot(fit.allp, extra = "auto")
+```
+
+### 8.3 Tree Pruning
+
+In this stage, we proceed with pruning the tree, utilizing the optimal complexity parameter (CP) obtained from the cross-validation results. The aim is to prune the tree with the best CP, specifically using fit.allp, to prevent overfitting. This involves selecting a tree size that minimizes the cross-validation error (xerror), favoring shallower trees over deeper ones.
+
+```{r, echo=FALSE,  fig.width=5, fig.height=4}
+pfit.allp <- prune(fit.allp, cp =
+    fit.allp$cptable[which.min(fit.allp$cptable[, "xerror"]), "CP"])
+rpart.plot(pfit.allp, extra = "auto")
+```
+
+### 8.4 Evaluation of Model Performance on Test Dataset
+
+In this section, we assess the model's performance using the test dataset. The evaluation includes calculating confusion matrices for test data predictions and computing key metrics such as accuracy, precision, recall (sensitivity or true positive rate), F1-score, specificity (true negative rate), and the misclassification error rate.
+
+```{r, echo=FALSE}
+test_df <- data.frame(actual = data.test$fetal_health, pred = NA)
+test_df$pred <- predict(pfit.allp, newdata = data.test, type = "class")
+(conf_matrix_base <- table(test_df$actual, test_df$pred)) #confusion matrix
+```
+
+```{r, echo=FALSE}
+accuracy_tree <- round((sum(diag(conf_matrix_base))/sum(conf_matrix_base))*100,2)
+
+# Assuming 'conf_matrix_base' is your confusion matrix
+TP <- conf_matrix_base[2, 2]
+TN <- conf_matrix_base[1, 1]
+FP <- conf_matrix_base[1, 2]
+FN <- conf_matrix_base[2, 1]
+
+# Precision
+precision <- round((TP / (TP + FP))*100,2)
+
+# Recall (Sensitivity)
+recall <- round((TP / (TP + FN))*100,2)
+
+specificity <- round((TN/(TN +FP))*100,2)
+
+# F1-score
+f1_score <- round((2 * (precision * recall) / (precision + recall)),2)
+
+cat("accuracy:", accuracy_tree,"%", "\n")
+
+cat("Precision:", precision,"%" , "\n")
+cat("Recall:", recall,"%" , "\n")
+cat("F1-Score:", f1_score,"%" , "\n")
+cat("specificity:", specificity,"%", "\n")
+```
+
+```{r, echo=FALSE}
+mis.rate <- (conf_matrix_base[1, 2] + conf_matrix_base[2, 1])/sum(conf_matrix_base)
+cat("misclassification error rate:",round((mis.rate)*100,2),"%", "\n")
+```
+
+As highlighted earlier, our primary focus is on the recall score. The evaluation revealed a commendable **recall of 74.74%** for the pruned tree, signifying its effectiveness in identifying approximately three-quarters of the actual positive cases and minimizing missed instances.
+
+**In comparison with the logistic regression model, the pruned tree from the CART algorithm demonstrates better performance with a higher recall of 74.74%, surpassing the logistic regression model's 71.58%.** Looking forward, we'll continue these comparisons with upcoming models, including Random Forest, XGBoost, and Ordinal logistic regression.
+
+## 9. Random Forest Model
+
+### 9.1 Fitting a Model
+
+```{r, echo=FALSE}
+library(ranger)
+set.seed(123457)
+train.prop <- 0.80
+strats <- data$fetal_health
+rr <- split(1:length(strats), strats)
+idx <- sort(as.numeric(unlist(sapply(rr, 
+        function(x) sample(x, length(x)*train.prop)))))
+data.train <- data[idx, ]
+data.test <- data[-idx, ]
+summary(data.train$fetal_health)/nrow(data.train)
+fit.rf.ranger <- ranger(fetal_health ~ ., data = data.train, 
+                   importance = 'impurity', mtry = 4)
+print(fit.rf.ranger)
+
+```
+
+The Out-of-Bag (OOB) prediction error, measured by Mean Squared Error (MSE), is **0.04046208.** OOB error is a method of measuring prediction error of random forests and other bagging models. Lower values are better.
+
+For optimal model with highest R-squared value mtry was chosen to be 4. The **R-squared value** is 0.7652451, this means approximately **76.52%** of the variance in fetal_health is explained by the model.
+
+```{r, echo=FALSE}
+library(vip)
+(v1 <- vi(fit.rf.ranger))
+```
+
+### 9.2 Calculating Confusion Matrix on Test Data
+
+```{r, echo=FALSE}
+# Predict using the model
+pred <- predict(fit.rf.ranger, data = data.test)
+
+# Create a dataframe with actual values and predicted probabilities
+test_df <- data.frame(actual = data.test$fetal_health, pred_prob = pred$predictions)
+
+# Convert predicted probabilities to class labels using a threshold (e.g., 0.5)
+threshold <- 0.5
+test_df$pred_class <- ifelse(test_df$pred_prob >= threshold, 1, 0)
+
+# Create a confusion matrix using the actual values and the predicted class labels
+conf_matrix_rf <- table(Actual = test_df$actual, Predicted = test_df$pred_class)
+
+# Print the confusion matrix
+conf_matrix_rf
+
+```
+
+-   True Negatives (TN): 325 These are the cases where the model correctly predicted the negative class (0).
+
+-   False Positives (FP): 6 These are the instances where the model incorrectly predicted the positive class (1), but the actual class was negative (0).
+
+-   False Negatives (FN): 15 These are the instances where the model incorrectly predicted the negative class (0), but the actual class was positive (1).
+
+-   True Positives (TP): 80 These are the cases where the model correctly predicted the positive class (1).
+
+### 9.3 Evaluating Performance Metrics
+
+```{r, echo=FALSE}
+# Confusion Matrix Values
+TN <- 325
+FP <- 6
+FN <- 15
+TP <- 80
+
+# Calculating metrics
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN) # Also known as Sensitivity
+f1_score <- 2 * (precision * recall) / (precision + recall)
+
+# Printing the metrics
+cat("Accuracy:", accuracy, "\n")
+cat("Precision:", precision, "\n")
+cat("Recall (Sensitivity):", recall, "\n")
+cat("F1 Score:", f1_score, "\n")
+
+```
+
+Accuracy (95.07%): This tells the overall correctness of randomf forest model. In other words, about 95% of the time, model makes the right prediction, whether it's identifying a case as positive or negative.
+
+Precision (93.02%): Precision is about how reliable the model is when it predicts a positive outcome. When the model says something is positive, it's correct 93% of the time.
+
+**Recall (Sensitivity) (84.21%**): Recall measures the model's ability to catch all the true positive cases. It tells that the model correctly identifies 84% of all actual positive cases.
+
+F1 Score (88.40%): The F1 Score balances precision and recall like a good balance between not missing many true cases (recall) and not making many false alarms (precision).
+
+The recall or sensitivity of the model stood at 84.21%. This reflects the model's capability to correctly identify the majority of concerning fetal health cases. In the context of prenatal healthcare, this means that the model is quite reliable in detecting cases that require further medical attention.
+
+## 10. XGBoost Model
+
+```{r, echo=FALSE}
+# Load required libraries
+library(xgboost)
+library(Matrix)
+library(caret)
+library(readr)
+```
+
+### 10.1 Split into Train asnd Test Sets
+
+```{r, echo=FALSE}
+
+# Split the data into training and testing sets (80-20 split)
+set.seed(123)  
+splitIndex <- createDataPartition(data$fetal_health, p = 0.8, list = FALSE)
+trainData <- data[splitIndex,]
+testData <- data[-splitIndex,]
+
+```
+
+### 10.2 Create DMatrices
+
+```{r, echo=FALSE}
+# Transform the predictor matrix using sparse.model.matrix
+matrix_predictors_train <- as.matrix(sparse.model.matrix(fetal_health ~ ., data = trainData))[, -1]
+matrix_predictors_test <- as.matrix(sparse.model.matrix(fetal_health ~ ., data = testData))[, -1]
+
+# Create DMatrices (no need to convert target variable, it's already numeric)
+dtrain <- xgboost::xgb.DMatrix(data = matrix_predictors_train, label = trainData$fetal_health)
+dtest <- xgboost::xgb.DMatrix(data = matrix_predictors_test, label = testData$fetal_health)
+```
+
+### 10.3 Fit XGBoost Model with defined parameters
+
+```{r, echo=FALSE}
+
+#Define XGBoost Parameters
+watchlist <- list(train = dtrain, test = dtest)
+param <- list(max_depth = 2, eta = 1, nthread = 2,
+              objective = "binary:logistic", eval_metric = "auc")
+
+model.xgb <- xgb.train(param, dtrain, nrounds = 2, watchlist)
+```
+
+The model's performance is improving from the first to the second iteration, which is a good sign. It suggests that additional iterations might continue to improve performance.There is not a huge gap between the training and test AUCs. This suggests that the model is **not overfitting significantly**. AUC values above **0.8** are generally considered good, indicating that **the model has a strong ability to distinguish between the two classes.**
+
+### 10.4 Measuring Prediction Accuracy
+
+#### 10.4.1 Train Data
+
+```{r, echo=FALSE}
+# Predict on training data
+pred.y.train <- predict(model.xgb, dtrain)
+prediction.train <- as.numeric(pred.y.train > 0.5)
+
+# Measure prediction accuracy on train data
+tab_train <- table(trainData$fetal_health, prediction.train)
+accuracy_train <- sum(diag(tab_train)) / sum(tab_train)
+
+```
+
+#### 10.4.2 Test Data
+
+```{r, echo=FALSE}
+
+# Predict on testing data
+pred.y.test <- predict(model.xgb, dtest)
+prediction.test <- as.numeric(pred.y.test > 0.5)
+
+# Measure prediction accuracy on test data
+tab_test <- table(testData$fetal_health, prediction.test)
+accuracy_test <- sum(diag(tab_test)) / sum(tab_test)
+```
+
+### 10.5 Evaluate Performance Metrics for Model on Test Data
+
+```{r, echo=FALSE}
+# Predict using the xgboost model on the test data
+test_pred_prob <- predict(model.xgb, dtest)
+# Convert probabilities to binary predictions using a threshold (default is 0.5)
+test_pred <- ifelse(test_pred_prob > 0.5, 1, 0)
+# Create a confusion matrix
+confusion_matrix <- table(testData$fetal_health, test_pred)
+# Calculate recall (true positive rate)
+recall <- confusion_matrix[2, 2] / (confusion_matrix[2, 2] + confusion_matrix[2, 1])
+
+# Calculate precision (positive predictive value)
+precision <- confusion_matrix[2, 2] / (confusion_matrix[2, 2] + confusion_matrix[1, 2])
+
+f1_score_xgb <- 2 * (precision * recall) / (precision + recall)
+
+cat("Precision:", precision,"%" , "\n")
+cat("Recall:", recall,"%" , "\n")
+cat("F1-Score:", f1_score_xgb,"%" , "\n")
+cat("Accuracy:", accuracy_test,"%" , "\n")
+
+```
+
+Sensitivity (**Recall** or True Positive Rate): This indicates that the model correctly identified **70.3%** of the actual positives. The positive predictive value is not as high, indicating the model's predictions are not that reliable when it predicts a positive outcome. **The F1 Score is 75.13.** In terms of **accuracy, 88.94%** of predictions were correct.
+
+## 11. Comparative Analysis between Binary Response Models
+
+The **XGBoost** model seems to be the greatest option given the project's focus on recall for clinical significance because it has the highest recall rate and an excellent F1 Score. Given the importance of all performance metrics in a medical context, the **Random Forest model** appears to be the best choice. It offers a strong balance across accuracy, precision, recall, and F1-score, suggesting it is reliable for both positive and negative predictions. While the XGBoost model excels in recall and F1 score, its lower specificity and accuracy may be a concern. The CART algorithm is a strong contender, especially in terms of specificity. In summary, the Random Forest model offers a robust, balanced performance suitable for a medical diagnostic tool, where both identifying positive cases and avoiding false positives are crucial. But for the purpose of this project, to not miss out any positive values, we can conclude that **XGBoost model would be the preferred model.**
+
+```{r, echo=FALSE}
+# Create a data frame to hold the model metrics
+model_comparison <- data.frame(
+  Model = c("Logistic Regression (Chosen Predictors)", 
+            "Logistic Regression (Full Predictors)", 
+            "Random Forest", 
+            "CART", 
+            "XGBoost"),
+  Accuracy = c(89.44, 89.44, 95.07, 94.13, 88.94),  # Percentages
+  Precision = c(79.07, 79.76, 93.02, 88.89, 80.68),  # Percentages
+  Recall = c(71.58, 70.53, 84.21, 84.21, 70.29),     # Percentages
+  F1_Score = c(75.14, 74.86, 88.40, 86.49, 75.13)        # Percentages, NA for missing values
+)
+
+# Print the comparison table
+print(model_comparison)
+
+```
+
+## 12. Ordinal Categorical Response Modeling
+
+Initially, our response variables consist of three classes, necessitating models designed for categorical responses with more than two levels. In this context, our responses are ordinal, signifying distinct states of fetal well-being and associated risks graded from 1 to 3 (indicating levels of danger). When dealing with an ordinal response variable, modeling cumulative logits is an effective approach.
+
+Our research questions: Do these variables explain fetal health? How well does cumulative logits model perform in classifying ordinal categorical responses for fetal health?
+
+### 12.1 Reloading Data and Preparing Train and Test Data
+
+```{r, echo=FALSE}
+ord <- read.csv("C:/Users/vadre/OneDrive/Desktop/fetal_health.csv")
+#colnames(ord)[colnames(ord) == "baseline.value"] <- "baseline_value"
+```
+
+```{r, echo=FALSE}
+names(ord)[names(ord) == "abnormal_short_term_variability"] <- "per_srt_var"
+names(ord)[names(ord) == "mean_value_of_short_term_variability"] <- "mean_srt_var"
+names(ord)[names(ord) == "percentage_of_time_with_abnormal_long_term_variability"] <- "per_long_var"
+names(ord)[names(ord) == "mean_value_of_long_term_variability"] <- "mean_long_var"
+```
+
+We perform an 80-20 split of the data, creating separate training and test sets. Subsequently, we verify whether the proportions of the three response levels are consistent across the train, test, and overall datasets.
+
+```{r, echo=FALSE}
+# Do 80-20 glass.train-glass.test split of the data dat - random split
+
+set.seed(123457)
+strats <- as.factor(ord$fetal_health)
+rr <- split(1:length(strats),strats)
+p<- 0.8
+idx <- 
+  sort(as.numeric(unlist(sapply(rr, function(x) sample(x, length(x) * p)))))
+ord.train <- ord[idx,]
+ord.test <- ord[-idx,]
+```
+
+```{r, echo=FALSE}
+combined_table <- cbind(
+  Train = table(ord.train$fetal_health) / nrow(ord.train),
+  Test = table(ord.test$fetal_health) / nrow(ord.test),
+  Overall = table(ord$fetal_health) / nrow(ord)
+)
+
+# Print the combined table
+print(combined_table)
+```
+
+### 12.2 Fitting Cumulative Logit Models
+
+Fit three models: a full model with all predictors, a null model with only the intercept, and a model employing variable selection.
+
+#### 12.2.1 Fitting Full Model with all predictors
+
+> *It's important to note that the polr() function, unfortunately, does not furnish p-values for each coefficient.*
+
+```{r, echo=FALSE}
+library(MASS) 
+ord.full <- polr(as.factor(fetal_health) ~ ., data = ord.train)
+```
+
+To address this limitation, the following code demonstrates how we can calculate the p-values and incorporate them into the output.
+
+```{r, echo=FALSE}
+ctable1 <- coef(summary(ord.full))
+p <- pnorm(abs(ctable1[, "t value"]), lower.tail = FALSE) * 2
+(ctable1 <- cbind(ctable1, "p value" = p))
+```
+
+From the coefficients, we can easily compute the odds ratios as follows.
+
+```{r, echo=FALSE}
+exp(coef(ord.full))
+```
+
+Most coefficients are small, suggesting limited influence of examined features on the event. Notably, severe_decelerations and prolongued_decelerations have "Inf" odds ratios, indicating infinite positive association. Caution is needed due to the potential for perfect separation, posing interpretational challenges in the model.
+
+#### 12.2.2 Fitting Null Model with Intercept only
+
+```{r, echo=FALSE}
+ord.null <- polr(as.factor(fetal_health)~1, data=ord.train)
+```
+
+Calculate the p-values and incorporate them with table.
+
+```{r, echo=FALSE}
+ctable2 <- coef(summary(ord.null))
+p <- pnorm(abs(ctable2[, "t value"]), lower.tail = FALSE) * 2
+(ctable2 <- cbind(ctable2, "p value" = p))
+```
+
+#### 12.2.3 Fitting Model with Chosen Predictors
+
+For enhanced model efficiency, we employ variable selection through a stepwise procedure, utilizing the smallest Akaike Information Criterion (AIC) as the criterion for selection. This approach helps streamline the model by identifying and incorporating the most influential predictors, contributing to a more concise and effective model.
+
+```{r, echo=FALSE}
+vs.s <- polr(as.factor(fetal_health)~1, data=ord.train)
+ord.step <- stepAIC(vs.s, scope = ~baseline.value + accelerations + fetal_movement + uterine_contractions + light_decelerations + severe_decelerations + prolongued_decelerations + abnormal_short_term_variability + mean_value_of_short_term_variability + percentage_of_time_with_abnormal_long_term_variability + mean_value_of_long_term_variability, trace=FALSE,
+             direction = "both")
+```
+
+Calculate the p-values and incorporate them with table.
+
+```{r, echo=FALSE}
+ctable3 <- coef(summary(ord.step))
+
+p <- pnorm(abs(ctable3[, "t value"]), lower.tail = FALSE) * 2
+(ctable3 <- cbind(ctable3, "p value" = p))
+```
+
+### 12.3 Residual Diagnostics
+
+#### 12.3.1 Normal QQ Plot
+
+The normal Q-Q plot aids in residual diagnostics to validate assumptions, identify outliers, and enhance the model's reliability.
+
+```{r,echo=FALSE, fig.width=4.5, fig.height=3}
+
+library(sure) 
+#Normal Q-Q plot of PO model residuals.
+autoplot.polr(ord.full) #q-q plot of residuals
+echo=FALSE
+```
+
+The residuals plotted follow a normal distribution with minimal deviations
+
+#### 12.3.2 Goodness-of-Fit \[GOF\] Plot
+
+The GoF plot gauges how well the model's residuals match the expected distribution. When the empirical Cumulative Distribution Function (CDF) line aligns with simulated lines within confidence bands, it confirms a robust fit, bolstering confidence in the model's ability to capture underlying data patterns.
+
+```{r,echo=FALSE, fig.width=4.5, fig.height=3}
+#Empirical c.d.f. of PO model residuals.
+plot(gof(ord.full, nsim = 50))  #gof plot
+```
+
+### 12.4 Evaluating Performance of Model
+
+We employ the optimized model selected through a stepwise procedure, prioritizing the smallest AIC as the criterion. Thus, we can evaluate model performance using the model fitted with selected variables. This evaluation encompasses the calculation of confusion matrices for test data predictions, along with the computation of key metrics such as precision, recall, and F1-score for each classification. Additionally, accuracy is determined by summing the diagonal elements and dividing by the total number of observations.
+
+```{r, echo=FALSE}
+ord.test$pred3 <- predict(ord.step, newdata = ord.test, type="class") 
+ctable.pred3 <- table(ord.test$fetal_health, ord.test$pred3) # classification table
+ctable.pred3
+```
+
+The accuracy is as follows:
+
+```{r, echo=FALSE}
+
+round((sum(diag(ctable.pred3))/sum(ctable.pred3))*100,2) # accuracy 
+```
+
+Calculating precision, recall, and F1-score for each class:
+
+```{r, echo=FALSE}
+precision <- diag(ctable.pred3) / rowSums(ctable.pred3)
+recall <- diag(ctable.pred3) / colSums(ctable.pred3)
+f1_score <- 2 * precision * recall / (precision + recall)
+
+# Print the results
+cat("Precision for Class 1:", precision[1], "\n")
+cat("Precision for Class 2:", precision[2], "\n")
+cat("Precision for Class 3:", precision[3], "\n")
+
+cat("Recall for Class 1:", recall[1], "\n")
+cat("Recall for Class 2:", recall[2], "\n")
+cat("Recall for Class 3:", recall[3], "\n")
+
+cat("F1-score for Class 1:", f1_score[1], "\n")
+cat("F1-score for Class 2:", f1_score[2], "\n")
+cat("F1-score for Class 3:", f1_score[3], "\n")
+```
+
+In conclusion, the ordinal model demonstrates proficiency in predicting fetal health class 1 (normal). However, its predictive accuracy diminishes notably for classes 2 (suspect) and 3 (pathological), particularly with a lower overall score for class 2 when compared to other binary models. Given that classes 2 and 3 correspond to Suspect and Pathological conditions, accurate prediction in these categories is crucial. Consequently, **the ordinal model proves less effective in predicting and classifying fetal health, especially in cases of non-normal fetal health conditions.**
+
+Poor performance in predicting class 2 and class3 may be attributed to its low representation in the dataset. Imbalances in class distribution can challenge the model's ability to learn and generalize effectively for minority classes, influencing overall predictive accuracy.
+
+## 13. Conclusion
+
+### 13.1 Summary
+
+```{r, echo=FALSE}
+library(ggplot2)
+
+# Data for the models and their recall rates
+models <- factor(c('Logistic Regression (Chosen Predictors)', 'Random Forest', 'CART', 'XGBoost',
+                    'Ordinal Model Class 2', 'Ordinal Model Class 3'),
+                 levels = c('Logistic Regression (Chosen Predictors)', 'Random Forest', 'CART', 'XGBoost',
+                             'Ordinal Model Class 2', 'Ordinal Model Class 3'))
+
+recall_rates <- c(71.58, 84.21, 84.21, 70.29, 45.10, 72.00)
+
+data <- data.frame(models, recall_rates)
+
+# Create the bar plot
+ggplot(data, aes(x = models, y = recall_rates, fill = models)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  theme_minimal() +
+  labs(title = "Comparative Recall Visualization", x = "Models", y = "Recall (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(palette = "Set3")  # Using a color palette for differentiation
+
+```
+
+In the evaluation of statistical modeling approaches for predicting fetal health, our analysis centered on the recall metric due to its clinical significance in minimizing the risk of failing to identify fetuses that require medical attention. The ordinal categorical response modeling, designed to capture the inherent order within the three levels of fetal health, was compared against binary logit modeling, which simplifies the prediction into a binary outcome.
+
+The Random Forest and CART models demonstrate the highest recall rates among the binary classifiers in our findings, both achieving 84.21%. This indicates a strong ability to identify fetuses at risk, which is a crucial capability in a prenatal health care setting. The XGBoost model, while generally a strong performer in machine learning tasks, shows a slightly lower recall rate of 70.29% in this particular context. This suggests that while XGBoost is often the model of choice for many prediction tasks, in the specific case of fetal health prediction, it is slightly outperformed by Random Forest and CART in terms of recall.
+
+The ordinal model shows a mixed performance across the three classes. For Class 1, which may represent the most critical cases, its recall rate is quite high at 90.57%. However, its performance drops significantly for Class 2, with a recall rate of only 45.10%, before rising again for Class 3 to 72.00%. This is discouraging as it suggests the model is not well-suited for identifying the most severe or moderate cases (positive cases). Taking into account the clinical importance of high recall in predicting fetal health, the Random Forest and CART models stand out as the best choices among the binary classifiers due to their balance of high recall across the board. In conclusion, if we are to prioritize a model that offers the best overall performance in terms of recall, the Random Forest and CART models would be recommended.
+
+### 13.2 Future Scope and Extensions
+
+Hybrid Modeling Approaches: We can further use ensemble techniques or hybrid approaches to combine the capabilities of different models (such as Random Forest, CART, and XGBoost) to produce better results. This might increase forecast accuracy, for example, one may use a meta-model that learns from the results of these individual models.
+
+Real-Time Prediction Systems: Creating prediction and monitoring systems in real-time that can be included into medical procedures to give prompt evaluations of fetal health.
+
+Personalized Predictive Models: Personalized medicine in prenatal care may be made possible by creating models that take into account unique attributes (such as genetic factors, past medical history of the mother, etc.).
