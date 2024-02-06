@@ -1,5 +1,5 @@
 *Now it's renovating! Please check in GitHub* <br/>
-Click the "View in Github" Button to check projects details OR use this [url link](https://github.com/im-ub/im-ub.github.io/)!
+Click the "View in Github" Button OR use this [url link](https://github.com/im-ub/im-ub.github.io/) to check details of projects!
 # Yoobee Lim
 MS in Data Science | UCONN 2024 <br />
 BE in Industrial and Management Engineering | (Hankuk University of Foriegn Studies) HUFS 2022
