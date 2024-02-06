@@ -1,4 +1,4 @@
-# Shortest Path for manager of Swing
+# KBO data analysis and win rate prediction
 ## Project Details
 Type: Undergrad Major, team project <br />
 Course Name: Database Design ad Application <br />
