@@ -1,6 +1,6 @@
 # Shortest Path for manager of Swing
 ## Project Details
-Type: Undergrad Major, team project <br \>
+Type: Undergrad Major, team project <br />
 Course Name: Data Structure & Algorithm  <br \>
 Date : 03-10-2021 ~ 06-10-2021  <br \>
 ## Project Description
