@@ -1,7 +1,7 @@
 # KBO data analysis and win rate prediction
 ## Project Details
 Type: Undergrad Major, team project <br />
-Course Name: Database Design ad Application <br />
+Course Name: Data Mining ad Application <br />
 Date : 09-10-2020 ~ 12-10-2020  <br />
 
 ## Project Description
