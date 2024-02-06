@@ -10,8 +10,8 @@ BE in Industrial and Management Engineering | (Hankuk University of Foriegn Stud
 - Shortest Path for manager of Swing
 - Beer Distribution Management Database
 
-## [Work]
-*Most of them have no code file because of policy*
+## Work
+*There is no code file because of policy*
 - Customer Data Analysis with Developed Dependency Ratings and Customer Segmentation
 - Development of Senior Nutritional Care Solution
 - Pluto Project: related with Natural Language Processing 
