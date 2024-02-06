@@ -2,7 +2,7 @@
 ## Project Details
 Type: Undergrad Major, team project <br />
 Course Name: Database Design ad Application <br />
-Date : 09-10-2020 ~ 12-10-2020  <br />
+Date : 09-10-2019 ~ 12-10-2019  <br />
 
 ## Project Description
 - Project Objective:
