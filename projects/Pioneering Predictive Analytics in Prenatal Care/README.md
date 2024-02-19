@@ -1,4 +1,4 @@
-# Beer Distribution Management Database
+# Pioneering Predictive Analytics in Prenatal Care
 ## Project Details
 Type: MS, team project <br />
 Course Name: Applied Statistics Data Science (STAT 5405) <br />
